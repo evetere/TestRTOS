@@ -10,12 +10,12 @@
 
 #include "sigma_delta/sigma_delta_hw.h"
 
-struct sigma_delta_operations {
+typedef struct {
 	void (*start_conversion)();
 	float (*result)();
 	void (*idle)();
-};
+} sigma_delta_operations;
 
-struct sigma_delta_operations init_sigma_delta(struct sigma_delta_hw_operations);
+sigma_delta_operations init_sigma_delta(sigma_delta_hw_operations);
 
 #endif /* INC_SIGMA_DELTA_H_ */

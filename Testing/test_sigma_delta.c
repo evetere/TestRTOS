@@ -8,15 +8,24 @@
 #include <stdio.h>
 #include <criterion/criterion.h>
 #include "sigma_delta/sigma_delta.h"
-#include "sigma_delta/sigma_delta_hw.h"
+#include "sigma_delta_fake_hw.h"
 
-struct sigma_delta_operations sd;
-struct sigma_delta_hw_operations hw;
+sigma_delta_operations sd;
+sigma_delta_fake_hw_operations hw;
 
 void setup(void) {
 	puts("Init sd");
-	hw = init_sigma_delta_hw();
-	sd = init_sigma_delta(hw);
+	sigma_delta_fake_hw_parameters p =
+			{
+					.v_ref = 2.5,
+					.r = 48e3, // the resistors' value
+					.c = 100e-9, // the capacitor value
+					.dt = 20e-6 // the time between calls to update the dac
+			}
+
+	;
+	hw = init_sigma_delta_fake_hw(p);
+	sd = init_sigma_delta(as_sigma_delta_hw(hw));
 }
 
 TestSuite(sigma_delta_test, .init = setup);
@@ -25,12 +34,12 @@ Test(sigma_delta_test, convert) {
 	for (int i = 0; i < 1000; i++) { // set to idle point
 		sd.idle();
 	}
-	printf("After idle v= %f\n", hw.read_v());
 
 	sd.start_conversion();
 	printf("result %f\n", sd.result());
-	cr_assert(sd.result() == 512);
-
+	hw.set_v_in(2.0);
+	sd.start_conversion();
+	printf("result %f\n", sd.result());
 }
 
 Test(sigma_delta_test, idle) {

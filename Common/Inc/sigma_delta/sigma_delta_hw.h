@@ -10,13 +10,11 @@
 
 #include <stdbool.h>
 
-struct sigma_delta_hw_operations {
+typedef struct sigma_delta_hw_operations_struct {
 	bool (*read_comparator)();
 	void (*write_dac)(bool);
-	void (*engage)(bool);
-	float (*read_v)();
-};
+} sigma_delta_hw_operations;
 
-struct sigma_delta_hw_operations init_sigma_delta_hw();
+sigma_delta_hw_operations init_sigma_delta_hw();
 
 #endif /* INC_SIGMA_DELTA_SIGMA_DELTA_HW_H_ */
