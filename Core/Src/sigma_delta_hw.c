@@ -1,25 +1,19 @@
+#include "main.h"
 #include "sigma_delta/sigma_delta_hw.h"
 
 #include <stdio.h>
-
-#define V_REF 2.5
-
-#define V_IN 3.0
-
-#define R 47E3
-#define C 100E-9
 
 /*
  * This function updates the voltage in the capacitor after the dac output is set
  */
 void sigma_delta_hw_write_dac(bool b) {
-	// TODO write to GPIO
+	HAL_GPIO_WritePin(DAC_GPIO_Port, DAC_Pin,
+			(b ? GPIO_PIN_SET : GPIO_PIN_RESET));
 }
 
 bool sigma_delta_hw_read_comparator() {
-	bool c = false;
-	// TODO read GPIO
-	return c;
+	GPIO_PinState s = HAL_GPIO_ReadPin(COMP_GPIO_Port, COMP_Pin);
+	return s;
 }
 
 static sigma_delta_hw_operations sigma_delta_hw_operations_bindings =

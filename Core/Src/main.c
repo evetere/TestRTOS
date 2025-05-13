@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,7 +41,12 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+SPI_HandleTypeDef hspi2;
+
+TIM_HandleTypeDef htim2;
+
 osThreadId defaultTaskHandle;
+osThreadId converterTaskHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -49,7 +54,10 @@ osThreadId defaultTaskHandle;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_SPI2_Init(void);
 void StartDefaultTask(void const *argument);
+void StartConverterTask(void const *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -78,6 +86,9 @@ int main(void)
 
 	/* USER CODE BEGIN Init */
 
+	sigma_delta_hw_operations sdhw = init_sigma_delta_hw();
+	init_sigma_delta(sdhw);
+
 	/* USER CODE END Init */
 
 	/* Configure the system clock */
@@ -89,8 +100,14 @@ int main(void)
 
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
+	MX_TIM2_Init();
+	MX_SPI2_Init();
 	/* USER CODE BEGIN 2 */
-
+	if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK)
+			{
+		/* Starting Error */
+		Error_Handler();
+	}
 	/* USER CODE END 2 */
 
 	/* USER CODE BEGIN RTOS_MUTEX */
@@ -113,6 +130,10 @@ int main(void)
 	/* definition and creation of defaultTask */
 	osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
 	defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+	/* definition and creation of converterTask */
+	osThreadDef(converterTask, StartConverterTask, osPriorityNormal, 0, 128);
+	converterTaskHandle = osThreadCreate(osThread(converterTask), NULL);
 
 	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -170,6 +191,89 @@ void SystemClock_Config(void)
 }
 
 /**
+ * @brief SPI2 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_SPI2_Init(void)
+{
+
+	/* USER CODE BEGIN SPI2_Init 0 */
+
+	/* USER CODE END SPI2_Init 0 */
+
+	/* USER CODE BEGIN SPI2_Init 1 */
+
+	/* USER CODE END SPI2_Init 1 */
+	/* SPI2 parameter configuration*/
+	hspi2.Instance = SPI2;
+	hspi2.Init.Mode = SPI_MODE_MASTER;
+	hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+	hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+	hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
+	hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+	hspi2.Init.NSS = SPI_NSS_SOFT;
+	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+	hspi2.Init.FirstBit = SPI_FIRSTBIT_LSB;
+	hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+	hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+	hspi2.Init.CRCPolynomial = 10;
+	if (HAL_SPI_Init(&hspi2) != HAL_OK)
+			{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN SPI2_Init 2 */
+
+	/* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
+ * @brief TIM2 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_TIM2_Init(void)
+{
+
+	/* USER CODE BEGIN TIM2_Init 0 */
+
+	/* USER CODE END TIM2_Init 0 */
+
+	TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
+	TIM_MasterConfigTypeDef sMasterConfig = { 0 };
+
+	/* USER CODE BEGIN TIM2_Init 1 */
+
+	/* USER CODE END TIM2_Init 1 */
+	htim2.Instance = TIM2;
+	htim2.Init.Prescaler = 8 - 1;
+	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim2.Init.Period = 200 - 1;
+	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+	if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+			{
+		Error_Handler();
+	}
+	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+	if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+			{
+		Error_Handler();
+	}
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+			{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN TIM2_Init 2 */
+
+	/* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
  * @brief GPIO Initialization Function
  * @param None
  * @retval None
@@ -182,18 +286,37 @@ static void MX_GPIO_Init(void)
 
 	/* GPIO Ports Clock Enable */
 	__HAL_RCC_GPIOD_CLK_ENABLE();
-	__HAL_RCC_GPIOB_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOA, DAC_Pin | TP_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
-	/*Configure GPIO pin : LED_Pin */
-	GPIO_InitStruct.Pin = LED_Pin;
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(DISPLAY_CS_GPIO_Port, DISPLAY_CS_Pin, GPIO_PIN_SET);
+
+	/*Configure GPIO pins : DAC_Pin TP_Pin */
+	GPIO_InitStruct.Pin = DAC_Pin | TP_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+	/*Configure GPIO pin : COMP_Pin */
+	GPIO_InitStruct.Pin = COMP_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	HAL_GPIO_Init(COMP_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pins : LED_Pin DISPLAY_CS_Pin */
+	GPIO_InitStruct.Pin = LED_Pin | DISPLAY_CS_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
 	/* USER CODE END MX_GPIO_Init_2 */
@@ -221,16 +344,46 @@ int _write(int file, char *ptr, int len) {
 void StartDefaultTask(void const *argument)
 {
 	/* USER CODE BEGIN 5 */
-	int i = 1;
 	for (;;) {
-		HAL_GPIO_WritePin(GPIOB, LED_Pin, GPIO_PIN_RESET);
-		osDelay(200);
-		osDelay(1000);
-		if (i++ > 10) {
-			i = 1;
+		vTaskResume(converterTaskHandle);
+		while (!get_sigma_delta().ended()) {
+			osDelay(100);
 		}
+		HAL_GPIO_WritePin(GPIOB, LED_Pin, GPIO_PIN_RESET);
+		osDelay(30);
+		HAL_GPIO_WritePin(GPIOB, LED_Pin, GPIO_PIN_SET);
+		int v = 3240 * get_sigma_delta().raw_result() >> 10;
+//		printf("v = %dmV\r\n", v);
+		HAL_GPIO_WritePin(DISPLAY_CS_GPIO_Port, DISPLAY_CS_Pin, GPIO_PIN_RESET);
+		uint8_t data[] = { 0x00, 0x00, 0x01, 0x00, 0b00100110 };
+		HAL_SPI_Transmit(&hspi2, data, 5, 100);
+		HAL_GPIO_WritePin(DISPLAY_CS_GPIO_Port, DISPLAY_CS_Pin, GPIO_PIN_SET);
+		osDelay(20);
 	}
 	/* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartConverterTask */
+/**
+ * @brief Function implementing the converterTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_StartConverterTask */
+void StartConverterTask(void const *argument)
+{
+	/* USER CODE BEGIN StartConverterTask */
+	/* Infinite loop */
+	while (1) {
+		vTaskSuspend(NULL);
+		taskENTER_CRITICAL();
+		sigma_delta_operations sd = get_sigma_delta();
+		sd.start_conversion();
+		while (!sd.ended())
+			get_sigma_delta().tick();
+		taskEXIT_CRITICAL();
+	}
+	/* USER CODE END StartConverterTask */
 }
 
 /**

@@ -18,9 +18,9 @@ void setup(void) {
 	sigma_delta_fake_hw_parameters p =
 			{
 					.v_ref = 2.5,
-					.r = 48e3, // the resistors' value
-					.c = 100e-9, // the capacitor value
-					.dt = 20e-6 // the time between calls to update the dac
+					.r = 47e3, // the resistors' value
+					.c = 220e-9, // the capacitor value
+					.dt = 200e-6 // the time between calls to update the dac
 			}
 
 	;
@@ -32,19 +32,27 @@ TestSuite(sigma_delta_test, .init = setup);
 
 Test(sigma_delta_test, convert) {
 	for (int i = 0; i < 1000; i++) { // set to idle point
-		sd.idle();
+		sd.tick();
 	}
-
+	hw.set_v_in(1.0);
 	sd.start_conversion();
+
+	while (!sd.ended())
+		sd.tick();
+
 	printf("result %f\n", sd.result());
+
 	hw.set_v_in(2.0);
 	sd.start_conversion();
+	while (!sd.ended())
+		sd.tick();
+
 	printf("result %f\n", sd.result());
 }
 
 Test(sigma_delta_test, idle) {
 	for (int i = 0; i < 250; i++) {
-		sd.idle();
+		sd.tick();
 //		printf("%d v= %f\n", i, hw.read_v());
 	}
 

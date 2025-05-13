@@ -1,3 +1,5 @@
 /Debug/
 /UnitTest/
 /AllTests/
+*.bak
+.DS_Store
